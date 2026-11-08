@@ -31,12 +31,12 @@ The report's RT/non-RT series split uses `sysinfo.rt`.
 | schbench   | schbench    | heavy (2x oversubscribed): rps + req p99 latency; light (N/2 workers): wake p99 latency |
 | memory-256k | sysbench   | cache-regime memory bandwidth, read/write MiB/s (256K blocks)            |
 | memory-64m | sysbench    | DRAM-regime memory bandwidth, read/write MiB/s (64M blocks)              |
-| net        | iperf3      | loopback TCP Gbps (plain + zero-copy), 64B UDP pps (1 + N streams)       |
+| net        | iperf3      | loopback TCP Gbps (plain + zero-copy), 64B UDP pps (1 + N streams); 10 s steady state after a 2 s warm-up, 10 reps |
 | syscall    | perf        | syscall entry/exit overhead                                              |
 | ipc        | perf        | scheduler+IPC throughput (hackbench-style)                               |
 | perf-pipe  | perf       | pinned pipe ping-pong wakeup cost from the root cgroup and 16 cpu-cgroup levels deep (creates cgroups, so run as root) |
-| timerlat   | rtla        | 1ms timer wakeup latency as seen by a user thread: p99.9 over all samples, max over all CPUs (tracefs, so run as root; kernel needs CONFIG_TIMERLAT_TRACER) |
-| osnoise    | rtla        | OS noise stolen from a busy loop on every CPU: total us, worst 1s period, longest single interruption (root; CONFIG_OSNOISE_TRACER) |
+| timerlat   | rtla        | 1ms timer wakeup latency as seen by a user thread: p99.9 and p99.99 over all samples (tracefs, so run as root; kernel needs CONFIG_TIMERLAT_TRACER) |
+| osnoise    | rtla        | OS noise stolen from a busy loop on every CPU: total us, p99.9 of single-interruption length (root; CONFIG_OSNOISE_TRACER + CONFIG_HIST_TRIGGERS) |
 | pagefault  | stress-ng   | page-fault rate                                                          |
 | fork       | stress-ng   | fork/exec rate                                                           |
 

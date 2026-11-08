@@ -21,7 +21,9 @@ def bench_net():
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(0.3)  # let server bind
         try:
-            r = run_bench(["iperf3", "-c", "127.0.0.1", "-p", "5210", "-t", "10", "-J"] + extra)
+            # -O 2: drop the first 2 s from the result so schedutil's ramp from idle is not
+            # averaged into a 10 s steady-state number (the governor itself stays under test)
+            r = run_bench(["iperf3", "-c", "127.0.0.1", "-p", "5210", "-t", "10", "-O", "2", "-J"] + extra)
         finally:
             srv.terminate()  # no-op if -1 already let it exit; kills it if the client failed
             srv.wait()
@@ -29,7 +31,8 @@ def bench_net():
         out[f"{name}.{k}"] = (v, "higher")
     return out
 
-BENCHMARKS = {"net": {"needs": "iperf3", "fn": bench_net}}
+# 10 reps: one dropped-packet rep in 5 is enough to leave a real 6% shift unconfirmed
+BENCHMARKS = {"net": {"needs": "iperf3", "fn": bench_net, "repeat": 10}}
 
 if __name__ == "__main__":
     main(BENCHMARKS)
