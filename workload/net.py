@@ -13,7 +13,10 @@ def bench_net():
     out = {}
     for name, extra, metric in [
         ("tcp",           pin,                 bw),
-        ("tcp-zc",        pin + ["-Z"],        bw),   # zero-copy (sendfile) send path
+        # zero-copy send path. -w 4M: with the default sndbuf autotuning MSG_ZEROCOPY engages
+        # or not per second (34 vs 18 Gbps, the latter = plain tcp); a fixed 4M buffer keeps
+        # it engaged every second, so this measures the zero-copy path and tcp the copy path.
+        ("tcp-zc",        pin + ["-Z", "-w", "4M"], bw),
         ("udp-64b",       udp,                 pps),
         ("udp-64b-multi", udp + ["-P", NPROC], pps),
     ]:
