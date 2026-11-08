@@ -56,6 +56,11 @@
 // the rank test keeps bimodal tails out; the % gate covers build-to-build text layout
 // noise, which in-run reps can't see. Set to >5%.
 const THRESHOLD = 5;
+// Wider gates for metrics that moved more than 5% between two builds with no kernel change
+// behind it (rpi4 7.3-rc4 → rc5, same config apart from the version); ≈ 2× that step.
+// Everything else reproduced within ~2% across builds and keeps THRESHOLD.
+const GATES = [[/^(perf-pipe|pagefault)\./, 8], [/^net\.udp/, 15], [/^schbench/, 15]];
+const gate = (bench, metric) => GATES.find(([re]) => re.test(`${bench}.${metric}`))?.[1] ?? THRESHOLD;
 const q = new URLSearchParams(location.search);  // ?platform=<dir>&cur=<run>&base=<run> deep-links a comparison; &view=overview for all runs, &series=rt|std|"" filters the runs in either view (RT and non-RT kernels are separate series)
 const $ = id => document.getElementById(id);
 const opts = { cache: "no-cache" };  // Pages sends max-age=600; revalidate so fresh runs show up immediately
@@ -160,10 +165,11 @@ const fmt = (m, run, bench) => {
 
 const arrow = better => `<span class="sys" title="${better} is better">${better === "higher" ? "↑" : "↓"}</span>`;
 
-// verdict for metric m against baseline bm: delta %, confidence the delta is real, status.
-function judge(m, bm, bench) {
+// verdict for run cur against run base on one metric: delta %, gate, confidence the delta is real, status.
+function judge(curName, baseName, bench, metric) {
+  const m = DATA[curName].benchmarks[bench][metric], bm = DATA[baseName].benchmarks[bench][metric];
   const d = (m.value - bm.value) / bm.value * 100;
-  const thr = THRESHOLD;
+  const thr = gate(bench, metric);
   // confidence the delta is real: Mann-Whitney rank test on the raw samples.
   // Latency metrics may be bimodal. The median flips modes on a single rep, and a
   // mean/std z-test on that flip reports false 99% confidence. Ranks don't care
@@ -201,23 +207,24 @@ function renderCompare() {
     let cells = `<td class="num">${fmt(m, cur, bench)}</td>`;
     if (base) {
       if (bm && bm.value) {
-        const { d, thr, conf, cls, st } = judge(m, bm, bench);
+        const { d, thr, conf, cls, st } = judge($("cur").value, $("base").value, bench, metric);
         cells = cells + `<td class="num">${fmt(bm, base, bench)}</td>` +
                 `<td class="num ${cls}">${d > 0 ? "+" : ""}${d.toFixed(1)}%</td>` +
+                `<td class="num sys">${thr}%</td>` +
                 `<td class="num ${cls}">${Math.abs(d) > thr ? (conf * 100).toFixed(0) + "%" : "–"}</td><td class="${cls}">${st}</td>` +
                 `<td class="sys">${pairNotes[`${bench}.${metric}`] || ""}</td>`;
       } else {
-        cells = cells + `<td class="num">–</td><td class="num"></td><td class="num"></td><td>new</td><td></td>`;
+        cells = cells + `<td class="num">–</td><td class="num"></td><td class="num"></td><td class="num"></td><td>new</td><td></td>`;
       }
     }
     rows += `<tr><td>${bench}</td><td>${metric} ${arrow(m.better)}</td>${cells}</tr>`;
   }
   const head = base
-    ? "<tr><th>benchmark</th><th>metric</th><th>current</th><th>compare with</th><th>delta</th><th>confidence</th><th>status</th><th>note</th></tr>"
+    ? "<tr><th>benchmark</th><th>metric</th><th>current</th><th>compare with</th><th>delta</th><th>gate</th><th>confidence</th><th>status</th><th>note</th></tr>"
     : "<tr><th>benchmark</th><th>metric</th><th>value</th></tr>";
   const skipped = Object.entries(cur.skipped || {})
     .map(([n, why]) => `<p class="sys">skipped ${n}: ${why}</p>`).join("");
-  $("out").innerHTML = `<table>${head}${rows}</table>${skipped}<p class="sys">↑/↓ = which direction is better.</p>`;
+  $("out").innerHTML = `<table>${head}${rows}</table>${skipped}<p class="sys">↑/↓ = which direction is better. gate = % a delta must pass before confidence is even asked.</p>`;
 }
 
 // overview: every run, oldest → newest. One table (value + % vs previous run)
@@ -225,7 +232,7 @@ function renderCompare() {
 const SHORT = n => n.replace(/-g[0-9a-f]{8}-[0-9a-f]{8}/, "");  // 7.3.0-rc5-g26f0d7eb-100638f0_n5 → 7.3.0-rc5_n5
 const TAG = n => n.match(/_n\d+$/)?.[0].slice(1) ?? SHORT(n);   // x-axis label: n5
 
-function plot(pts, better, bench) {  // pts: [{run, value?, std?}] in x order; gaps where a run lacks the metric
+function plot(pts, better, bench, metric) {  // pts: [{run, value?, std?}] in x order; gaps where a run lacks the metric
   const W = 240, H = 64, L = 40, R = 8, T = 6, B = 14;
   const vs = pts.map(p => p.value).filter(v => v != null);
   let lo = Math.min(...vs), hi = Math.max(...vs);
@@ -245,7 +252,7 @@ function plot(pts, better, bench) {  // pts: [{run, value?, std?}] in x order; g
     if (a.value == null || b.value == null) continue;  // break the line across a missing run
     const dir = Math.sign(b.value - a.value) * (up ? 1 : -1);
     const cls = dir > 0 ? "good" : dir < 0 ? "bad" : "flat";
-    const weak = a.value && judge(b, a, bench).cls ? "" : " weak";
+    const weak = a.value && judge(b.run, a.run, bench, metric).cls ? "" : " weak";
     s += `<line class="line ${cls}${weak}" x1="${x(i - 1)}" y1="${y(a.value)}" x2="${x(i)}" y2="${y(b.value)}"/>`;
   }
   pts.forEach((p, i) => {
@@ -270,17 +277,17 @@ function renderOverview() {
     for (const p of pts) {
       let cell = p.value != null ? fmt(p, DATA[p.run], bench) : "–";
       if (p.value != null && prev?.value) {
-        const { d, cls } = judge(p, prev, bench);
-        cell += `<div class="sys ${cls}">${d > 0 ? "+" : ""}${d.toFixed(1)}%</div>`;
+        const { d, thr, cls } = judge(p.run, prev.run, bench, metric);
+        cell += `<div class="sys ${cls}" title="gate ${thr}%">${d > 0 ? "+" : ""}${d.toFixed(1)}%</div>`;
       }
       cells += `<td class="num">${cell}</td>`;
       if (p.value != null) prev = p;
     }
-    rows += `<tr><td>${bench}</td><td>${metric} ${arrow(better)}</td>${cells}<td class="plot">${plot(pts, better, bench)}</td></tr>`;
+    rows += `<tr><td>${bench}</td><td>${metric} ${arrow(better)}</td>${cells}<td class="plot">${plot(pts, better, bench, metric)}</td></tr>`;
   }
   const head = `<tr><th>benchmark</th><th>metric</th>${runs.map(n => `<th class="run" title="${n}">${SHORT(n)}</th>`).join("")}<th>trend</th></tr>`;
   $("out").innerHTML = `<table>${head}${rows}</table>` +
-    `<p class="sys">% is vs the previous run that has the metric; colored only when confirmed past the threshold, as in compare view. ↑/↓ = which direction is better.</p>`;
+    `<p class="sys">% is vs the previous run that has the metric; colored only when confirmed past the gate (hover a % for the gate), as in compare view. ↑/↓ = which direction is better.</p>`;
 }
 
 function render() {
