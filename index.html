@@ -17,9 +17,9 @@
   .reg { color: #c0392b; font-weight: 600; }
   .imp { color: #1e8449; }
   .sys { color: #666; font-size: .85rem; margin: .3rem 0; overflow-wrap: anywhere; }
-  #sys table, #cfg table { font-size: .85rem; color: #444; }
-  #sys td, #cfg td { overflow-wrap: anywhere; }
-  #cfg summary { font-size: .85rem; color: #666; cursor: pointer; margin-top: .5rem; }
+  #sys table, #hw table, #cfg table { font-size: .85rem; color: #444; }
+  #sys td, #hw td, #cfg td { overflow-wrap: anywhere; }
+  summary { font-size: .85rem; color: #666; cursor: pointer; margin-top: .5rem; }
   td.diff { background: #fff3cd; }
   td span[title] { text-decoration: underline dotted #999; cursor: help; }
   th.run { font-size: .8rem; font-weight: 500; }
@@ -46,9 +46,9 @@
   <label>benchmark <select id="bench"></select></label>
   <label>last runs <input id="last" type="number" min="2" step="1" placeholder="all" style="width:4.5em"></label>
   <label>series <select id="series"><option value="std">non-RT</option><option value="rt">RT</option><option value="">— all —</option></select></label>
-  <a id="hwlink" href="platform.html">platform info</a>
 </p>
 <div id="sys"></div>
+<div id="hw"></div>
 <div id="cfg"></div>
 <div id="out"></div>
 <script type="module">
@@ -69,7 +69,6 @@ const plat = q.get("platform") ?? platforms[0];
 for (const p of platforms) $("plat").add(new Option(p, p));
 $("plat").value = plat;
 $("plat").onchange = () => location.search = "?platform=" + encodeURIComponent($("plat").value);
-$("hwlink").href = "platform.html?platform=" + encodeURIComponent(plat);
 const DATA = await (await fetch(`data/${plat}/results.json`, opts)).json();
 const names = Object.keys(DATA).sort((a, b) => DATA[b].sysinfo.date.localeCompare(DATA[a].sysinfo.date));  // newest first
 const RT = n => !!DATA[n].sysinfo.rt;  // set at run time from CONFIG_PREEMPT_RT=y
@@ -114,6 +113,15 @@ function sysTable(cur, base) {
   return `<table>${head}${rows}</table>`;
 }
 
+// hw.json: one flat table of the board, folded by default
+fetch(`data/${plat}/hw.json`, opts).then(async r => {
+  if (!r.ok) return;
+  const rows = Object.entries(await r.json()).flatMap(([k, v]) =>
+    typeof v === "object" ? Object.entries(v).map(([sk, sv]) => `<tr><td>${k}.${sk}</td><td>${sv}</td></tr>`)
+                          : [`<tr><td>${k}</td><td>${v}</td></tr>`]);
+  $("hw").innerHTML = `<details><summary>platform info</summary><table>${rows.join("")}</table></details>`;
+});
+
 // kernel configs are stored deduped as data/<platform>/configs/<hash>.config; sysinfo only
 // holds the hash. When cur and base hashes differ, fetch both and list the
 // options that changed (set lines + "# CONFIG_X is not set" lines).
@@ -144,14 +152,7 @@ async function cfgDiff(cur, base) {
     `<table><tr><th>option</th><th>current</th><th>compare with</th></tr>${rows}</table></details>`;
 }
 
-// metric visibility: optional benchmark filter, plus the schbench split —
-// schbench-heavy is saturated: rps + req latency are meaningful, wake latency
-// just reads back preemption granularity. schbench-light is underloaded: wake
-// latency measures scheduler responsiveness, req/rps just reflect offered load.
-const shown = (bench, metric) =>
-  (!$("bench").value || bench === $("bench").value) &&
-  !(bench === "schbench-heavy" && metric.startsWith("wake_")) &&
-  !(bench === "schbench-light" && !metric.startsWith("wake_"));
+const shown = bench => !$("bench").value || bench === $("bench").value;  // optional benchmark filter
 
 // hover popup: per-rep samples, plus per-rep [start→max] °C and min MHz when the run recorded them
 const fmt = (m, run, bench) => {
@@ -198,11 +199,8 @@ function renderCompare() {
   $("sys").innerHTML = sysTable(cur, base);
   cfgDiff(cur, base);
   let rows = "";
-  // notes are keyed by comparison pair: run.notes[<other run key>][bench.metric],
-  // shown for that pair in either direction
-  const pairNotes = base && (cur.notes?.[$("base").value] || base.notes?.[$("cur").value]) || {};
   for (const [bench, metric, m] of metrics(cur)) {
-    if (!shown(bench, metric)) continue;
+    if (!shown(bench)) continue;
     const bm = base?.benchmarks[bench]?.[metric];
     let cells = `<td class="num">${fmt(m, cur, bench)}</td>`;
     if (base) {
@@ -211,16 +209,15 @@ function renderCompare() {
         cells = cells + `<td class="num">${fmt(bm, base, bench)}</td>` +
                 `<td class="num ${cls}">${d > 0 ? "+" : ""}${d.toFixed(1)}%</td>` +
                 `<td class="num sys">${thr}%</td>` +
-                `<td class="num ${cls}">${Math.abs(d) > thr ? (conf * 100).toFixed(0) + "%" : "–"}</td><td class="${cls}">${st}</td>` +
-                `<td class="sys">${pairNotes[`${bench}.${metric}`] || ""}</td>`;
+                `<td class="num ${cls}">${Math.abs(d) > thr ? (conf * 100).toFixed(0) + "%" : "–"}</td><td class="${cls}">${st}</td>`;
       } else {
-        cells = cells + `<td class="num">–</td><td class="num"></td><td class="num"></td><td class="num"></td><td>new</td><td></td>`;
+        cells = cells + `<td class="num">–</td><td class="num"></td><td class="num"></td><td class="num"></td><td>new</td>`;
       }
     }
     rows += `<tr><td>${bench}</td><td>${metric} ${arrow(m.better)}</td>${cells}</tr>`;
   }
   const head = base
-    ? "<tr><th>benchmark</th><th>metric</th><th>current</th><th>compare with</th><th>delta</th><th>gate</th><th>confidence</th><th>status</th><th>note</th></tr>"
+    ? "<tr><th>benchmark</th><th>metric</th><th>current</th><th>compare with</th><th>delta</th><th>gate</th><th>confidence</th><th>status</th></tr>"
     : "<tr><th>benchmark</th><th>metric</th><th>value</th></tr>";
   const skipped = Object.entries(cur.skipped || {})
     .map(([n, why]) => `<p class="sys">skipped ${n}: ${why}</p>`).join("");
@@ -269,7 +266,7 @@ function renderOverview() {
   const runs = [...names].reverse().filter(inSeries).slice(n >= 2 ? -n : 0);
   const keys = new Map();  // "bench.metric" → [bench, metric, better], first-seen order
   for (const n of runs) for (const [b, m, v] of metrics(DATA[n]))
-    if (shown(b, m)) keys.set(`${b}.${m}`, [b, m, v.better]);
+    if (shown(b)) keys.set(`${b}.${m}`, [b, m, v.better]);
   let rows = "";
   for (const [bench, metric, better] of keys.values()) {
     const pts = runs.map(n => ({ run: n, ...(DATA[n].benchmarks[bench]?.[metric] ?? {}) }));
