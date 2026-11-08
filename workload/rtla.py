@@ -3,8 +3,8 @@ timerlat — a 1ms periodic timer on every CPU, latency until a user thread runs
 kernel thread + return to user); p99.9 and p99.99 over all samples (CONFIG_TIMERLAT_TRACER).
 osnoise — a busy loop on every CPU, counting the time stolen by irqs, softirqs, NMIs
 and other threads (CONFIG_OSNOISE_TRACER + CONFIG_HIST_TRIGGERS for the histogram)."""
-import os
-from common import run_bench, main
+import os, shutil, subprocess, time
+from common import NPROC, run_bench, main
 
 DURATION = 30  # s per rep; timerlat's 1ms period -> 30k samples per CPU
 ENTRIES = 4096  # timerlat hist buckets of 1us; samples past this land in "over:"
@@ -52,9 +52,8 @@ def _merge(cols, hist, summ):
         h[ENTRIES] = h.get(ENTRIES, 0) + over
     return h
 
-def bench_timerlat():
-    _root()
-    cols, hist, summ = _hist(["rtla", "timerlat", "hist", "-u", "-d", f"{DURATION}s", "-E", ENTRIES])
+def _timerlat():
+    cols, hist, summ = _hist(["rtla", "timerlat", "hist", "-u", "-P", "f:90", "-d", f"{DURATION}s", "-E", ENTRIES])
     # Only the user-thread latency is kept: it is what an application sees and already
     # contains the irq and kernel-thread legs. irq.* was identical across kernels (board
     # floor), avg barely moves, p99 is bimodal on non-RT; run rtla by hand to see the layers.
@@ -63,6 +62,25 @@ def bench_timerlat():
     # p99.9 at 67 vs 66). p99.99 is the top ~12 of 120k samples, a tail that can still settle.
     return {"p99.9_us": (_pct(h, .999), "lower"),
             "p99.99_us": (_pct(h, .9999), "lower")}
+
+def bench_timerlat():
+    _root()
+    return _timerlat()
+
+def bench_timerlat_load():
+    """timerlat (FIFO 90) while stress-ng hogs every CPU and churns memory at normal
+    priority: long non-preemptible sections only show up when the box is busy."""
+    _root()
+    if not shutil.which("stress-ng"):
+        raise RuntimeError("needs stress-ng for the background load")
+    load = subprocess.Popen(["stress-ng", "--cpu", str(NPROC), "--vm", "2", "--vm-bytes", "128M",
+                             "-t", str(DURATION * 3)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(2)  # let the hogs settle before sampling
+    try:
+        return _timerlat()
+    finally:
+        load.terminate()
+        load.wait()
 
 def bench_osnoise():
     """noise_us: time stolen from the busy loops, summed over CPUs for the whole run
@@ -75,6 +93,7 @@ def bench_osnoise():
             "p99.9_single_us": (_pct(_merge(cols, hist, summ), .999), "lower")}
 
 BENCHMARKS = {"timerlat": {"needs": "rtla", "fn": bench_timerlat},
+              "timerlat-load": {"needs": "rtla", "fn": bench_timerlat_load},
               "osnoise": {"needs": "rtla", "fn": bench_osnoise}}
 
 if __name__ == "__main__":
