@@ -39,7 +39,7 @@ The report's RT/non-RT series split uses `sysinfo.rt`.
 | osnoise    | rtla        | OS noise stolen from a busy loop on every CPU: total us, p99.9 of single-interruption length (root; CONFIG_OSNOISE_TRACER + CONFIG_HIST_TRIGGERS) |
 | pagefault  | stress-ng   | page-fault rate                                                          |
 | fork       | stress-ng   | fork/exec rate                                                           |
-| mmap       | stress-ng   | mmap + touch + munmap of 8M per op: VMA setup/teardown rate              |
+| mmap       | stress-ng   | mmap + touch + munmap of 8M per op: VMA setup/teardown rate; 10 reps (in-run CV ~8%) |
 | timerfd    | stress-ng   | timerfd arm/expire/read rate (hrtimer path)                              |
 | dentry     | stress-ng   | create/unlink dentries on tmpfs: vfs + dcache rate, no disk              |
 | futex      | perf        | futex hash (uncontended wait/wake) and lock-pi (contended PI lock, the rtmutex path) ops/s |

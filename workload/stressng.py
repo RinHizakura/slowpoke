@@ -12,7 +12,7 @@ BENCHMARKS = {
     "pagefault": {"needs": "stress-ng", "fn": lambda: _stressng("fault")},
     "fork":      {"needs": "stress-ng", "fn": lambda: _stressng("fork")},
     # map + touch + unmap 8M per op: VMA setup/teardown with a little faulting, not a second pagefault
-    "mmap":      {"needs": "stress-ng", "fn": lambda: _stressng("mmap", "--mmap-bytes", "8M")},
+    "mmap":      {"needs": "stress-ng", "fn": lambda: _stressng("mmap", "--mmap-bytes", "8M"), "repeat": 10},
     "timerfd":   {"needs": "stress-ng", "fn": lambda: _stressng("timerfd")},  # hrtimer arm/expire/read
     "dentry":    {"needs": "stress-ng", "fn": lambda: _stressng("dentry", "--temp-path", "/dev/shm")},  # vfs + dcache, no disk
 }
