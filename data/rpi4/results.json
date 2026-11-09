@@ -2879,8 +2879,7 @@
       "preempt": "lazy",
       "config": "ca73bf4b",
       "boot_kernel_s": 4.566,
-      "mmap_rerun": "2026-11-09T23:58:25",
-      "note": "bio +14% vs 7.3-rc7 comes from the arm64 percpu/preempt series, not from block/null_blk (zero null_blk commits in range): 95d2c5f6663bb..479671f943c92 arm64: percpu: preemptible this_cpu_*() ops; 1bee18253c2ea arm64: preempt: simplify __preempt_count_dec_and_test(); 6254b223153d6 arm64: preempt: should_resched() unlikely; b9d267b9d632f sched: dynamic: simplify preempt_schedule(). perf stat fio qd1 nullb0: instructions/IO 8757 -> 8637, branch-misses/IO 46.6 -> 23.4, same cycles. RT unchanged (129k IOPS both; no PREEMPT_DYNAMIC, per-IO cost dominated by the threaded-softirq context switch)."
+      "mmap_rerun": "2026-11-09T23:58:25"
     },
     "benchmarks": {
       "bio": {
@@ -2931,7 +2930,8 @@
             522506.85
           ],
           "better": "higher"
-        }
+        },
+        "note": "+14% vs 7.3-rc7 from arm64 percpu/preempt, not block: b7f3aa93f4070..479671f943c92 \"arm64: percpu: preemptible this_cpu_*() ops\" (10 patches); 1bee18253c2ea \"arm64: preempt: Simplify and optimize __preempt_count_dec_and_test()\"; 6254b223153d6 \"arm64: preempt: Treat should_resched() as unlikely\"; b9d267b9d632f \"sched: dynamic: Simplify preempt_schedule{,_notrace}()\""
       },
       "epoll": {
         "ops_s": {

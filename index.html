@@ -98,7 +98,7 @@ function metrics(r) {
   const out = [];
   for (const [bench, ms] of Object.entries(r.benchmarks))
     for (const [metric, m] of Object.entries(ms))
-      out.push([bench, metric, m]);
+      if (metric !== "note") out.push([bench, metric, m]);  // benchmarks[b].note is free text, shown under the bench
   return out;
 }
 
@@ -219,6 +219,9 @@ function renderCompare() {
       }
     }
     rows += `<tr><td>${bench}</td><td>${metric} ${arrow(m.better)}</td>${cells}</tr>`;
+    const note = cur.benchmarks[bench].note;
+    if (note && Object.keys(cur.benchmarks[bench]).filter(k => k !== "note").at(-1) === metric)
+      rows += `<tr><td></td><td class="sys" colspan="${base ? 7 : 2}">${note}</td></tr>`;
   }
   const head = base
     ? "<tr><th>benchmark</th><th>metric</th><th>current</th><th>compare with</th><th>delta</th><th>gate</th><th>confidence</th><th>status</th></tr>"
