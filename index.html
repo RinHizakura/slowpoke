@@ -203,6 +203,7 @@ function renderCompare() {
   $("sys").innerHTML = sysTable(cur, base);
   cfgDiff(cur, base);
   let rows = "";
+  const hasNote = Object.values(cur.benchmarks).some(b => b.note);
   for (const [bench, metric, m] of metrics(cur)) {
     if (!shown(bench)) continue;
     const bm = base?.benchmarks[bench]?.[metric];
@@ -218,14 +219,13 @@ function renderCompare() {
         cells = cells + `<td class="num">–</td><td class="num"></td><td class="num"></td><td class="num"></td><td>new</td>`;
       }
     }
+    if (hasNote)  // the bench's note sits beside its first metric row
+      cells += `<td class="sys">${Object.keys(cur.benchmarks[bench]).find(k => k !== "note") === metric ? cur.benchmarks[bench].note ?? "" : ""}</td>`;
     rows += `<tr><td>${bench}</td><td>${metric} ${arrow(m.better)}</td>${cells}</tr>`;
-    const note = cur.benchmarks[bench].note;
-    if (note && Object.keys(cur.benchmarks[bench]).filter(k => k !== "note").at(-1) === metric)
-      rows += `<tr><td></td><td class="sys" colspan="${base ? 7 : 2}">${note}</td></tr>`;
   }
-  const head = base
-    ? "<tr><th>benchmark</th><th>metric</th><th>current</th><th>compare with</th><th>delta</th><th>gate</th><th>confidence</th><th>status</th></tr>"
-    : "<tr><th>benchmark</th><th>metric</th><th>value</th></tr>";
+  const head = (base
+    ? "<tr><th>benchmark</th><th>metric</th><th>current</th><th>compare with</th><th>delta</th><th>gate</th><th>confidence</th><th>status</th>"
+    : "<tr><th>benchmark</th><th>metric</th><th>value</th>") + (hasNote ? "<th>note</th></tr>" : "</tr>");
   const skipped = Object.entries(cur.skipped || {})
     .map(([n, why]) => `<p class="sys">skipped ${n}: ${why}</p>`).join("");
   $("out").innerHTML = `<table>${head}${rows}</table>${skipped}<p class="sys">↑/↓ = which direction is better. gate = % a delta must pass before confidence is even asked.</p>`;
