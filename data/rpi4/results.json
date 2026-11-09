@@ -2931,7 +2931,7 @@
           ],
           "better": "higher"
         },
-        "note": "+14% vs 7.3-rc7 from arm64 percpu/preempt, not block: b7f3aa93f4070..479671f943c92 \"arm64: percpu: preemptible this_cpu_*() ops\" (10 patches); 1bee18253c2ea \"arm64: preempt: Simplify and optimize __preempt_count_dec_and_test()\"; 6254b223153d6 \"arm64: preempt: Treat should_resched() as unlikely\"; b9d267b9d632f \"sched: dynamic: Simplify preempt_schedule{,_notrace}()\""
+        "note": "+14% vs 7.3-rc7: arm64 \"Preemptible this_cpu_*() operations\" series (Mark Rutland, 7.4 arm64-upstream 303bff3637d13)"
       },
       "epoll": {
         "ops_s": {
