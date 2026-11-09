@@ -57,7 +57,7 @@
 // noise, which in-run reps can't see. Set to >5%.
 const THRESHOLD = 5;
 // Wider gates for metrics that moved more than 5% between builds with no kernel change
-// behind them (rpi4: 7.3-rc4 → rc5, and two 7.3-rc7 builds n1/n5, n2/n6). Observed swings:
+// behind them (rpi4: 7.3-rc4 → rc5, and two independent 7.3-rc7 builds, RT and non-RT). Observed swings:
 // perf-pipe 10%, pagefault 4%, net.tcp 14% (sndbuf autotuning), udp 4%, schbench-light
 // 2 us on 9 us (1 us resolution), timerlat p99.9 29% on RT. Everything else stayed within
 // ~2% across builds and keeps THRESHOLD.
