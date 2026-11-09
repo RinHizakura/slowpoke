@@ -59,9 +59,10 @@ const THRESHOLD = 5;
 // Wider gates for metrics that moved more than 5% between builds with no kernel change
 // behind them (rpi4: 7.3-rc4 → rc5, and two independent 7.3-rc7 builds, RT and non-RT). Observed swings:
 // perf-pipe 10%, pagefault 4%, net.tcp 14% (sndbuf autotuning), udp 4%, schbench-light
-// 2 us on 9 us (1 us resolution), timerlat p99.9 29% on RT. Everything else stayed within
-// ~2% across builds and keeps THRESHOLD.
-const GATES = [[/^perf-pipe\./, 12], [/^pagefault\./, 8], [/^net\./, 15],
+// 2 us on 9 us (1 us resolution), timerlat p99.9 29% on RT, mmap 8% between two runs of
+// the same binary (frequency-bound, in-run CV ~8%). Everything else stayed within ~2%
+// across builds and keeps THRESHOLD.
+const GATES = [[/^perf-pipe\./, 12], [/^pagefault\./, 8], [/^net\./, 15], [/^mmap\./, 10],
                [/^schbench-light/, 25], [/^schbench/, 15], [/^(timerlat|osnoise)/, 30]];
 const gate = (bench, metric) => GATES.find(([re]) => re.test(`${bench}.${metric}`))?.[1] ?? THRESHOLD;
 const q = new URLSearchParams(location.search);  // ?platform=<dir>&cur=<run>&base=<run> deep-links a comparison; &view=overview for all runs, &series=rt|std|"" filters the runs in either view (RT and non-RT kernels are separate series)
