@@ -162,6 +162,7 @@ def sysinfo():
         except OSError:
             continue
         info[name] = m.group(1) if name in ("thp", "preempt") and (m := re.search(r"[\[(](\w+)[\])]", v)) else v
+    info["loadavg"] = " ".join(Path("/proc/loadavg").read_text().split()[:3])  # background load at suite start
     if cfg := kconfig():
         h = hashlib.sha1(cfg.encode()).hexdigest()[:8]
         d = ROOT / "data" / PREFIX / "configs"
